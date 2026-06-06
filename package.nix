@@ -7,11 +7,11 @@
 
 stdenv.mkDerivation rec {
   pname = "rtk";
-  version = "0.42.1";
+  version = "0.42.3";
 
   src = fetchurl {
     url = "https://github.com/rtk-ai/rtk/releases/download/v${version}/rtk-x86_64-unknown-linux-musl.tar.gz";
-    hash = "sha256-o3yjAKQlEKlkRT8rwuIXdp7whyeAr4AtuKfWmPHaJGU=";
+    hash = "sha256-XfdkpjNwnLhdJIJY0IXSTslfqovKDmg1qTzVfK3E654=";
   };
 
   sourceRoot = ".";
