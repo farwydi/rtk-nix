@@ -1,8 +1,8 @@
-name: Auto-update rtk
+name: update
 
 on:
   schedule:
-    - cron: "0 6 * * *"
+    - cron: "0 6 * * *" # ежедневно 9:00 МСК
   workflow_dispatch:
 
 permissions:
@@ -13,40 +13,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Get current version
-        id: current
-        run: echo "version=$(grep 'version = ' package.nix | head -1 | sed 's/.*"\(.*\)".*/\1/')" >> "$GITHUB_OUTPUT"
-
-      - name: Get latest version
-        id: latest
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Run update
+        run: ./update.sh
+      - name: Build check
+        run: nix-build -E 'with import <nixpkgs> {}; callPackage ./package.nix {}'
+      - name: Commit if changed
         run: |
-          VERSION=$(curl -sI https://github.com/rtk-ai/rtk/releases/latest \
-            | grep -i ^location: \
-            | sed 's|.*/v||' \
-            | tr -d '\r')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Update package
-        if: steps.current.outputs.version != steps.latest.outputs.version
-        run: |
-          VERSION="${{ steps.latest.outputs.version }}"
-          URL="https://github.com/rtk-ai/rtk/releases/download/v${VERSION}/rtk-x86_64-unknown-linux-musl.tar.gz"
-
-          curl -sL "$URL" -o rtk.tar.gz
-          HASH=$(sha256sum rtk.tar.gz | awk '{print $1}' | xxd -r -p | base64 -w0)
-          rm rtk.tar.gz
-
-          sed -i "s|version = \".*\"|version = \"$VERSION\"|" package.nix
-          sed -i "s|hash = \".*\"|hash = \"sha256-$HASH\"|" package.nix
-
-          echo "Updated to v$VERSION (sha256-$HASH)"
-
-      - name: Commit and push
-        if: steps.current.outputs.version != steps.latest.outputs.version
-        run: |
+          if git diff --quiet -- package.nix; then
+            echo "already up to date"
+            exit 0
+          fi
+          ver=$(grep 'version = ' package.nix | head -1 | sed 's/.*"\(.*\)".*/\1/')
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.nix
-          git commit -m "Update rtk to v${{ steps.latest.outputs.version }}"
+          git commit -am "rtk: update to $ver"
           git push
